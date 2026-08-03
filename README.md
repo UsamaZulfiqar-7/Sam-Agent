@@ -30,11 +30,17 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-**Note:** `pyaudio` Windows pe kabhi kabhi direct install nahi hota. Agar error aaye to:
+Agar `pyaudio` install karte waqt problem aaye, to ye command try karo:
 ```
-pip install pipwin
-pipwin install pyaudio
+python dependency_setup.py
 ```
+
+Windows par agar `pip install pyaudio` fail ho jaye, to usually ye kaam karta hai:
+```
+py -m pip install pyaudio
+```
+
+Agar abhi bhi issue ho, to Python version ke hisaab se wheel download karke install karo: https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
 
 ### 6. config.py update karo
 `config.py` file kholo aur `APP_PATHS` mein apne actual installed apps ke paths daalo.
