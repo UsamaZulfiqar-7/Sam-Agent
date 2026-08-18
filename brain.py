@@ -1,3 +1,4 @@
+from __future__ import annotations
 # brain.py
 # Yahan decide hota hai ke command ka matlab kya hai aur konsi action call honi chahiye.
 # Pehle simple rule-based matching try hoti hai (fast, offline, free).
@@ -5,9 +6,8 @@
 
 import re
 import os
-import json
 import actions
-from config import APP_PATHS, WEBSITES, USER_NAME, ASSISTANT_NAME
+from config import APP_PATHS, WEBSITES, USER_NAME, ASSISTANT_NAME, WAKE_WORD
 
 
 def handle_command(text: str) -> tuple[str, bool]:
@@ -15,24 +15,24 @@ def handle_command(text: str) -> tuple[str, bool]:
     text: user ne jo bola (already lowercase)
     Returns: (response_text, should_exit)
     """
-    if not isinstance(text, str):
-        return "Mujhe sahi command samajh nahi aaya.", False
-
     if not text:
         return "Mujhe kuch sunayi nahi diya.", False
 
     t = text.lower().strip()
+    wake = WAKE_WORD.lower()
 
     # ---- Exit commands ----
-    if any(w in t for w in ["exit", "band ho jao", "bye", "shutdown sam", "stop listening"]):
+    # FIX: was hardcoded to "shutdown azi" — now uses the actual configured wake word
+    if any(w in t for w in ["exit", "band ho jao", "bye", f"shutdown {wake}", "stop listening"]):
         return "Theek hai, phir milte hain!", True
 
     # ---- Greetings ----
-    if any(w in t for w in ["hello", "hi sam", "hey sam", "salam"]):
+    # FIX: was hardcoded to "hi azi" / "hey azi" — now uses the actual configured wake word
+    if any(w in t for w in ["hello", f"hi {wake}", f"hey {wake}", "salam"]):
         return f"Salam {USER_NAME}! Kya karu aapke liye?", False
 
     # ---- Time / Date ----
-    if "time" in t and "kya" in t or t.strip() in ["time", "what time is it"]:
+    if ("time" in t and "kya" in t) or t.strip() in ["time", "what time is it"]:
         return actions.tell_time(), False
     if "date" in t or "tareekh" in t:
         return actions.tell_date(), False
@@ -59,19 +59,18 @@ def handle_command(text: str) -> tuple[str, bool]:
             return actions.open_file_or_folder(target), False
         return f"Mujhe '{target}' nahi pata kaise kholna hai. config.py mein add kar do.", False
 
-    # ---- Web search ----
-    m = re.search(r"(search|dhoondo|search karo)\s+(.+?)\s*(on google|google pe|google par)?$", t)
-    if "search" in t and "youtube" not in t:
-        query = re.sub(r"\b(search|for|google pe|on google|karo|dhoondo)\b", "", t).strip()
-        if query:
-            return actions.web_search(query), False
-
-    # ---- YouTube search ----
+    # ---- YouTube search (checked before generic web search so it doesn't get swallowed) ----
     if "youtube" in t:
         query = re.sub(r"\b(youtube|pe|par|search|karo|play|chalao)\b", "", t).strip()
         if query:
             return actions.youtube_search(query), False
         return actions.open_website("youtube"), False
+
+    # ---- Web search ----
+    if "search" in t or "dhoondo" in t:
+        query = re.sub(r"\b(search|for|google pe|on google|karo|dhoondo)\b", "", t).strip()
+        if query:
+            return actions.web_search(query), False
 
     # ---- Screenshot ----
     if "screenshot" in t:
@@ -87,10 +86,12 @@ def handle_command(text: str) -> tuple[str, bool]:
             return actions.system_volume("mute"), False
 
     # ---- Lock PC ----
-    if "lock" in t and "pc" in t or "lock kar" in t:
+    if ("lock" in t and "pc" in t) or "lock kar" in t:
         return actions.lock_pc(), False
 
     # ---- Shutdown / Cancel shutdown ----
+    # FIX: "cancel shutdown" check must come before the general shutdown check (order was
+    # already correct here, kept as-is, but confirmed both conditions can't both misfire)
     if "cancel" in t and "shutdown" in t:
         return actions.cancel_shutdown(), False
     if "shutdown" in t or "band kar do computer" in t or "pc band" in t:

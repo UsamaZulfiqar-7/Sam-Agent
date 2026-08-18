@@ -149,14 +149,19 @@ def _get_microphone():
         return None
 
 
-def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT):
+def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=True):
     """
     Mic se audio record karke text mein convert karta hai.
     Kuch na suna to None return karega.
+
+    verbose=True: har outcome (timeout, silence, unclear, no-internet) print karega
+    taake "chup rehna" kabhi na ho — hamesha pata chale kya hua.
     """
+    global _cached_device_index
+
     mic = _get_microphone()
     if mic is None:
-        print("No microphone device detected.")
+        print("[SAM][ERROR] Koi microphone device mila hi nahi. PyAudio/driver check karo.")
         return None
 
     for attempt in range(2):
@@ -167,10 +172,12 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT):
                 # Prevent threshold from dropping to 0 (causes recognizer to hang)
                 if recognizer.energy_threshold < 100:
                     recognizer.energy_threshold = 100
-                print(f"  (energy_threshold={recognizer.energy_threshold:.0f}, listening...)")
+                if verbose:
+                    print(f"  (energy_threshold={recognizer.energy_threshold:.0f}, listening...)")
 
                 if timeout is not None and timeout <= 0:
-                    print("Listening timeout is zero; skipping capture.")
+                    if verbose:
+                        print("[SAM][INFO] Listening timeout is zero; skipping capture.")
                     return None
 
                 try:
@@ -181,30 +188,45 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT):
                     )
                 except sr.WaitTimeoutError:
                     if attempt == 0:
-                        print("  Retry...")
+                        if verbose:
+                            print("[SAM][INFO] Kuch awaaz nahi aayi (timeout). Dobara try...")
                         continue
+                    if verbose:
+                        print("[SAM][INFO] Dobara bhi kuch nahi suna. Mic ke bilkul paas, saaf bolo.")
                     return None
                 except OSError as exc:
-                    print(f"Mic capture error: {exc}")
+                    print(f"[SAM][ERROR] Mic capture error: {exc}")
                     return None
         except OSError as exc:
-            print(f"Mic setup error: {exc}")
-            # Reset cached device in case it went bad
+            print(f"[SAM][ERROR] Mic setup error: {exc}")
+            # Reset cached device in case it went bad, so next call re-detects a mic
             _cached_device_index = None
             return None
 
-        try:
-            text = recognizer.recognize_google(audio, language="en-US")
-            print(f"[Aap] {text}")
-            return text.lower().strip() if text else None
-        except sr.UnknownValueError:
-            return None
-        except sr.RequestError as exc:
-            print(f"Internet check karo — STT ke liye internet chahiye: {exc}")
-            return None
-        except Exception as exc:
-            print(f"Speech recognition error: {exc}")
-            return None
+        # ---- Speech-to-text ----
+        # Try en-US first (covers wake word + English commands), then fall back
+        # to a couple of other locales so Roman-Urdu-flavoured phrases have a
+        # better chance of being transcribed instead of silently failing.
+        last_exc = None
+        for lang in ("en-US", "en-IN"):
+            try:
+                text = recognizer.recognize_google(audio, language=lang)
+                if text:
+                    print(f"[Aap] {text}")
+                    return text.lower().strip()
+            except sr.UnknownValueError:
+                last_exc = "unclear"
+                continue
+            except sr.RequestError as exc:
+                print(f"[SAM][ERROR] Internet check karo — STT ke liye internet chahiye: {exc}")
+                return None
+            except Exception as exc:
+                print(f"[SAM][ERROR] Speech recognition error: {exc}")
+                return None
+
+        if last_exc == "unclear" and verbose:
+            print("[SAM][INFO] Awaaz aayi lekin samajh nahi payi (unclear speech). Saaf aur zaraa zor se bolo.")
+        return None
 
     return None
 
@@ -214,11 +236,14 @@ def listen_for_wake_word(wake_word: str):
     Continuously sunta rehta hai jab tak wake word ('sam') na bole jaye.
     """
     try:
-        text = listen(timeout=5, phrase_time_limit=4)
+        text = listen(timeout=5, phrase_time_limit=4, verbose=False)
     except Exception as exc:
-        print(f"Wake-word listening error: {exc}")
+        print(f"[SAM][ERROR] Wake-word listening error: {exc}")
         return False
 
     if text and wake_word in text:
         return True
+    if text:
+        # Heard something, just not the wake word — useful to see while debugging
+        print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
     return False

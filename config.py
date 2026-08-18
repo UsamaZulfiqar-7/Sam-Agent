@@ -45,3 +45,7 @@ WEBSITES = {
 
 # Screenshot save location
 SCREENSHOT_DIR = r"C:\Users\%USERNAME%\Pictures\SAM_Screenshots"
+
+# Optional: agar galat microphone select ho raha hai, environment variable set kar do
+# (Windows CMD mein: set SAM_MICROPHONE_INDEX=2 )
+# listener.py startup pe available devices ki list print kar deta hai taake sahi number pata chal sake.

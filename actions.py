@@ -19,7 +19,10 @@ def open_app(app_name: str) -> str:
         return f"Mujhe '{app_name}' ka path nahi pata. config.py mein add kar do."
     try:
         expanded = os.path.expandvars(path)
-        os.startfile(expanded) if IS_WINDOWS else subprocess.Popen(expanded)
+        if IS_WINDOWS:
+            os.startfile(expanded)
+        else:
+            subprocess.Popen(expanded)
         return f"{app_name} khol raha hoon."
     except Exception as e:
         return f"{app_name} khulne mein masla aa gaya: {e}"
@@ -53,9 +56,10 @@ def youtube_search(query: str) -> str:
 def take_screenshot() -> str:
     try:
         import pyautogui
-        os.makedirs(os.path.expandvars(SCREENSHOT_DIR), exist_ok=True)
+        target_dir = os.path.expandvars(SCREENSHOT_DIR)
+        os.makedirs(target_dir, exist_ok=True)
         filename = datetime.datetime.now().strftime("screenshot_%Y%m%d_%H%M%S.png")
-        filepath = os.path.join(os.path.expandvars(SCREENSHOT_DIR), filename)
+        filepath = os.path.join(target_dir, filename)
         img = pyautogui.screenshot()
         img.save(filepath)
         return f"Screenshot save ho gaya: {filepath}"
@@ -115,6 +119,8 @@ def lock_pc() -> str:
 
 
 def open_file_or_folder(path: str) -> str:
+    if not IS_WINDOWS:
+        return "Yeh feature sirf Windows pe kaam karta hai."
     try:
         expanded = os.path.expandvars(path)
         os.startfile(expanded)
