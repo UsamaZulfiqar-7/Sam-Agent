@@ -9,6 +9,12 @@ import os
 import actions
 from config import APP_PATHS, WEBSITES, USER_NAME, ASSISTANT_NAME, WAKE_WORD
 
+# --- Social media commands (Instagram/LinkedIn/WhatsApp/website builder) ---
+# Agar tumne SAM_Social wali files (instagram_actions.py, linkedin_actions.py,
+# whatsapp_actions.py, website_builder.py, social_config.py, social_brain.py)
+# isi folder mein copy ki hain to yeh import uncomment kar do:
+# from social_brain import handle_social_command
+
 
 def handle_command(text: str) -> tuple[str, bool]:
     """
@@ -22,12 +28,10 @@ def handle_command(text: str) -> tuple[str, bool]:
     wake = WAKE_WORD.lower()
 
     # ---- Exit commands ----
-    # FIX: was hardcoded to "shutdown azi" — now uses the actual configured wake word
     if any(w in t for w in ["exit", "band ho jao", "bye", f"shutdown {wake}", "stop listening"]):
         return "Theek hai, phir milte hain!", True
 
     # ---- Greetings ----
-    # FIX: was hardcoded to "hi azi" / "hey azi" — now uses the actual configured wake word
     if any(w in t for w in ["hello", f"hi {wake}", f"hey {wake}", "salam"]):
         return f"Salam {USER_NAME}! Kya karu aapke liye?", False
 
@@ -36,6 +40,11 @@ def handle_command(text: str) -> tuple[str, bool]:
         return actions.tell_time(), False
     if "date" in t or "tareekh" in t:
         return actions.tell_date(), False
+
+    # ---- Social media commands (agar social_brain import ki hai to yeh uncomment karo) ----
+    # social_response = handle_social_command(t)
+    # if social_response:
+    #     return social_response, False
 
     # ---- Open app ----
     m = re.search(r"(open|khol|khol do|start)\s+(.+)", t)
@@ -47,19 +56,17 @@ def handle_command(text: str) -> tuple[str, bool]:
             return actions.open_app(target), False
         if target in WEBSITES:
             return actions.open_website(target), False
-        # try partial match
         for app in APP_PATHS:
             if app in target:
                 return actions.open_app(app), False
         for site in WEBSITES:
             if site in target:
                 return actions.open_website(site), False
-        # agar file/folder path lagta hai
         if "\\" in target or "/" in target or ":" in target:
             return actions.open_file_or_folder(target), False
         return f"Mujhe '{target}' nahi pata kaise kholna hai. config.py mein add kar do.", False
 
-    # ---- YouTube search (checked before generic web search so it doesn't get swallowed) ----
+    # ---- YouTube search (checked before generic web search) ----
     if "youtube" in t:
         query = re.sub(r"\b(youtube|pe|par|search|karo|play|chalao)\b", "", t).strip()
         if query:
@@ -90,8 +97,6 @@ def handle_command(text: str) -> tuple[str, bool]:
         return actions.lock_pc(), False
 
     # ---- Shutdown / Cancel shutdown ----
-    # FIX: "cancel shutdown" check must come before the general shutdown check (order was
-    # already correct here, kept as-is, but confirmed both conditions can't both misfire)
     if "cancel" in t and "shutdown" in t:
         return actions.cancel_shutdown(), False
     if "shutdown" in t or "band kar do computer" in t or "pc band" in t:
@@ -112,11 +117,6 @@ def handle_command(text: str) -> tuple[str, bool]:
 
 
 def try_claude_fallback(text: str):
-    """
-    Optional: agar ANTHROPIC_API_KEY environment variable set hai,
-    to Claude se pooch ke conversational reply de sakta hai
-    (jab command na ho balke normal baat ho).
-    """
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
         return None

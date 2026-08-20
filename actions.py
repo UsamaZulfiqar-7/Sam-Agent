@@ -32,7 +32,6 @@ def open_website(site_name: str) -> str:
     site_name = site_name.lower().strip()
     url = WEBSITES.get(site_name, None)
     if not url:
-        # agar direct URL type kiya ho
         if "." in site_name:
             url = "https://" + site_name.replace(" ", "")
         else:

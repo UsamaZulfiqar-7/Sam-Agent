@@ -5,20 +5,18 @@ import speech_recognition as sr
 from config import LISTEN_TIMEOUT, PHRASE_TIME_LIMIT
 
 recognizer = sr.Recognizer()
-recognizer.energy_threshold = 300          # 150 was too low — dynamic adjust overcorrected
+recognizer.energy_threshold = 300
 recognizer.dynamic_energy_threshold = True
 recognizer.dynamic_energy_adjustment_damping = 0.15
-recognizer.dynamic_energy_adjustment_ratio = 1.3  # was 1.5 — less aggressive = more sensitive
+recognizer.dynamic_energy_adjustment_ratio = 1.3
 recognizer.pause_threshold = 0.8
 recognizer.non_speaking_duration = 0.5
 
-# Cache device index so we don't re-enumerate every 3 seconds
 _cached_device_index = None
 _startup_done = False
 
 
 def _startup_diagnostics():
-    """Print all input devices once at startup so user can see what's available."""
     global _startup_done
     if _startup_done:
         return
@@ -42,12 +40,9 @@ def _startup_diagnostics():
 
 
 def _get_microphone():
-    """Find the best microphone. Caches device index after first detection."""
     global _cached_device_index
-
     _startup_diagnostics()
 
-    # Reuse cached device
     if _cached_device_index is not None:
         return sr.Microphone(device_index=_cached_device_index)
 
@@ -55,7 +50,6 @@ def _get_microphone():
         import os
         import pyaudio
 
-        # Manual override via env var
         preferred_index = os.getenv("SAM_MICROPHONE_INDEX")
         if preferred_index:
             try:
@@ -68,14 +62,9 @@ def _get_microphone():
 
         pa = pyaudio.PyAudio()
         try:
-            # Names to SKIP (virtual/mapper devices that often don't capture real audio)
-            skip_names = ["sound mapper", "loopback", "stereo mix", "what u hear",
-                          "pc speaker"]
-            # Names that indicate a REAL microphone
-            real_mic_names = ["microphone", "mic array", "headset", "webcam",
-                              "frontmic"]
+            skip_names = ["sound mapper", "loopback", "stereo mix", "what u hear", "pc speaker"]
+            real_mic_names = ["microphone", "mic array", "headset", "webcam", "frontmic"]
 
-            # Collect all real mic candidates
             candidates = []
             for i in range(pa.get_device_count()):
                 info = pa.get_device_info_by_index(i)
@@ -88,21 +77,18 @@ def _get_microphone():
                 if any(r in name for r in real_mic_names):
                     candidates.append((i, info, channels))
 
-            # Priority 1: Prefer 1-2 channel mics (4-ch arrays cause silence in mono mode)
             for i, info, channels in candidates:
                 if channels <= 2:
                     _cached_device_index = i
                     print(f">> Selected mic: [{i}] {info['name']} ({channels}ch)")
                     return sr.Microphone(device_index=i)
 
-            # Priority 1b: If only 4-ch mics found, use the first one
             if candidates:
                 i, info, channels = candidates[0]
                 _cached_device_index = i
                 print(f">> Selected mic (multi-ch): [{i}] {info['name']} ({channels}ch)")
                 return sr.Microphone(device_index=i)
 
-            # Priority 2: System default input device
             try:
                 default_info = pa.get_default_input_device_info()
                 if default_info and "index" in default_info:
@@ -113,7 +99,6 @@ def _get_microphone():
             except (IOError, OSError):
                 pass
 
-            # Priority 3: Any non-mapper input device
             for i in range(pa.get_device_count()):
                 info = pa.get_device_info_by_index(i)
                 if int(info.get("maxInputChannels", 0)) <= 0:
@@ -125,7 +110,6 @@ def _get_microphone():
                 print(f">> Fallback device: [{i}] {info['name']}")
                 return sr.Microphone(device_index=i)
 
-            # Priority 4: Last resort — even mapper device
             for i in range(pa.get_device_count()):
                 info = pa.get_device_info_by_index(i)
                 if int(info.get("maxInputChannels", 0)) > 0:
@@ -151,11 +135,7 @@ def _get_microphone():
 
 def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=True):
     """
-    Mic se audio record karke text mein convert karta hai.
-    Kuch na suna to None return karega.
-
-    verbose=True: har outcome (timeout, silence, unclear, no-internet) print karega
-    taake "chup rehna" kabhi na ho — hamesha pata chale kya hua.
+    verbose=True: har outcome (timeout, silence, unclear, no-internet) print karega.
     """
     global _cached_device_index
 
@@ -167,9 +147,7 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
     for attempt in range(2):
         try:
             with mic as source:
-                # Only do full calibration on first ever call, then quick calibration
                 recognizer.adjust_for_ambient_noise(source, duration=0.5)
-                # Prevent threshold from dropping to 0 (causes recognizer to hang)
                 if recognizer.energy_threshold < 100:
                     recognizer.energy_threshold = 100
                 if verbose:
@@ -199,14 +177,9 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
                     return None
         except OSError as exc:
             print(f"[SAM][ERROR] Mic setup error: {exc}")
-            # Reset cached device in case it went bad, so next call re-detects a mic
             _cached_device_index = None
             return None
 
-        # ---- Speech-to-text ----
-        # Try en-US first (covers wake word + English commands), then fall back
-        # to a couple of other locales so Roman-Urdu-flavoured phrases have a
-        # better chance of being transcribed instead of silently failing.
         last_exc = None
         for lang in ("en-US", "en-IN"):
             try:
@@ -232,9 +205,6 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
 
 
 def listen_for_wake_word(wake_word: str):
-    """
-    Continuously sunta rehta hai jab tak wake word ('sam') na bole jaye.
-    """
     try:
         text = listen(timeout=5, phrase_time_limit=4, verbose=False)
     except Exception as exc:
@@ -244,6 +214,5 @@ def listen_for_wake_word(wake_word: str):
     if text and wake_word in text:
         return True
     if text:
-        # Heard something, just not the wake word — useful to see while debugging
         print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
     return False

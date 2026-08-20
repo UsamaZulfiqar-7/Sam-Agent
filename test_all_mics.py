@@ -40,7 +40,7 @@ for i in range(p.get_device_count()):
 
             status = "*** WORKING ***" if max_amp > 500 else ("maybe" if max_amp > 50 else "silent")
             print(f"  [{i:2d}] {name:<50} rate={rate:5d}  amp={max_amp:6d}  {status}")
-            break  # first working rate is enough
+            break
         except Exception:
             continue
     else:
