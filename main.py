@@ -2,7 +2,7 @@
 # SAM ka main loop. Yeh file run karo: python main.py
 
 from config import WAKE_WORD, USER_NAME, ASSISTANT_NAME
-from listener import listen, listen_for_wake_word
+from listener_google import listen, listen_for_wake_word
 from speaker import speak
 from brain import handle_command
 
