@@ -16,6 +16,7 @@ import time
 import struct
 
 from config import LISTEN_TIMEOUT, PHRASE_TIME_LIMIT
+print(">>> LISTENER.PY (VOSK VERSION) — MODULE LOADED <<<", flush=True)
 
 # ============================================================
 # CONFIG
