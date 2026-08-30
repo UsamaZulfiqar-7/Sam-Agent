@@ -99,48 +99,85 @@ def tell_date() -> str:
 def shutdown_pc(delay_sec=30) -> str:
     if not IS_WINDOWS:
         return "Yeh feature sirf Windows pe kaam karta hai."
-    os.system(f"shutdown /s /t {delay_sec}")
-    return f"PC {delay_sec} seconds mein shutdown ho jayega. Cancel karne ke liye 'shutdown cancel karo' bolo."
+    try:
+        subprocess.run(["shutdown", "/s", "/t", str(int(delay_sec))], check=True)
+        return f"PC {delay_sec} seconds mein shutdown ho jayega. Cancel karne ke liye 'shutdown cancel karo' bolo."
+    except Exception as e:
+        return f"Shutdown command execute nahi ho sakti: {e}"
 
 
 def cancel_shutdown() -> str:
     if not IS_WINDOWS:
         return "Yeh feature sirf Windows pe kaam karta hai."
-    os.system("shutdown /a")
-    return "Shutdown cancel kar diya."
+    try:
+        subprocess.run(["shutdown", "/a"], check=True)
+        return "Shutdown cancel kar diya."
+    except Exception as e:
+        return f"Shutdown cancel nahi ho saka: {e}"
 
 
 def lock_pc() -> str:
     if not IS_WINDOWS:
         return "Yeh feature sirf Windows pe kaam karta hai."
-    os.system("rundll32.exe user32.dll,LockWorkStation")
-    return "PC lock kar raha hoon."
+    try:
+        subprocess.run(["rundll32.exe", "user32.dll,LockWorkStation"], check=True)
+        return "PC lock kar raha hoon."
+    except Exception as e:
+        return f"PC lock nahi ho saka: {e}"
+
+
+def _is_safe_path(path: str) -> bool:
+    """Checks if path exists and prevents basic traversal attacks."""
+    try:
+        resolved = os.path.realpath(path)
+        return os.path.exists(resolved)
+    except Exception:
+        return False
 
 
 def open_file_or_folder(path: str) -> str:
     if not IS_WINDOWS:
         return "Yeh feature sirf Windows pe kaam karta hai."
     try:
-        expanded = os.path.expandvars(path)
+        expanded = os.path.expandvars(os.path.expanduser(path))
+        if not _is_safe_path(expanded):
+            return f"Path nahi mila ya unsafe hai: {path}"
         os.startfile(expanded)
         return f"Khol raha hoon: {path}"
     except Exception as e:
         return f"Nahi khul saka: {e}"
 
 
-def search_files(filename: str, search_dir: str = None) -> str:
-    """User ke pure user folder mein file search karta hai (thora slow ho sakta hai)"""
+def search_files(filename: str, search_dir: str = None, max_depth: int = 3) -> str:
+    """User folder mein fast file search with depth limits and directory pruning."""
     if search_dir is None:
         search_dir = os.path.expanduser("~")
+    
+    EXCLUDE_DIRS = {"appdata", ".git", "node_modules", "$recycle.bin", "system volume information", "venv", "__pycache__"}
     matches = []
-    for root, dirs, files in os.walk(search_dir):
-        for f in files:
-            if filename.lower() in f.lower():
-                matches.append(os.path.join(root, f))
-                if len(matches) >= 5:
-                    break
-        if len(matches) >= 5:
-            break
+    base_depth = search_dir.rstrip(os.sep).count(os.sep)
+
+    try:
+        for root, dirs, files in os.walk(search_dir):
+            # Prune excluded directories
+            dirs[:] = [d for d in dirs if d.lower() not in EXCLUDE_DIRS]
+            
+            # Check current depth limit
+            current_depth = root.count(os.sep) - base_depth
+            if current_depth > max_depth:
+                dirs[:] = []
+                continue
+
+            for f in files:
+                if filename.lower() in f.lower():
+                    matches.append(os.path.join(root, f))
+                    if len(matches) >= 5:
+                        break
+            if len(matches) >= 5:
+                break
+    except Exception as e:
+        return f"File search error: {e}"
+
     if matches:
         return "Mila:\n" + "\n".join(matches)
     return f"'{filename}' naam ki koi file nahi mili."

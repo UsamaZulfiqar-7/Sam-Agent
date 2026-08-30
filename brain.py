@@ -9,13 +9,6 @@ import os
 import actions
 from config import APP_PATHS, WEBSITES, USER_NAME, ASSISTANT_NAME, WAKE_WORD
 
-# --- Social media commands (Instagram/LinkedIn/WhatsApp/website builder) ---
-# Agar tumne SAM_Social wali files (instagram_actions.py, linkedin_actions.py,
-# whatsapp_actions.py, website_builder.py, social_config.py, social_brain.py)
-# isi folder mein copy ki hain to yeh import uncomment kar do:
-# from social_brain import handle_social_command
-
-
 def handle_command(text: str) -> tuple[str, bool]:
     """
     text: user ne jo bola (already lowercase)
@@ -41,10 +34,6 @@ def handle_command(text: str) -> tuple[str, bool]:
     if "date" in t or "tareekh" in t:
         return actions.tell_date(), False
 
-    # ---- Social media commands (agar social_brain import ki hai to yeh uncomment karo) ----
-    # social_response = handle_social_command(t)
-    # if social_response:
-    #     return social_response, False
 
     # ---- Open app ----
     m = re.search(r"(open|khol|khol do|start)\s+(.+)", t)

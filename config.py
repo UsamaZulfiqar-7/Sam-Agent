@@ -1,6 +1,22 @@
-# config.py
-# SAM ki basic settings aur commonly used app paths.
-# Apni machine ke hisaab se paths change kar lena (Windows pe "where <appname>" chala kar path pata karo)
+import os
+from pathlib import Path
+
+# STT Engine Selection: "vosk" (offline, default) ya "google" (online API)
+STT_ENGINE = os.getenv("SAM_STT_ENGINE", "vosk").lower()
+
+# Vosk Offline Model Path Resolution:
+# 1. Check environment variable VOSK_MODEL_PATH
+# 2. Check workspace relative folder 'vosk-model-small-en-us-0.15'
+# 3. Fallback to C:\vosk-model-small-en-us-0.15
+_BASE_DIR = Path(__file__).parent.resolve()
+_LOCAL_VOSK_DIR = _BASE_DIR / "vosk-model-small-en-us-0.15"
+
+if os.getenv("VOSK_MODEL_PATH"):
+    VOSK_MODEL_PATH = os.getenv("VOSK_MODEL_PATH")
+elif _LOCAL_VOSK_DIR.exists() and _LOCAL_VOSK_DIR.is_dir():
+    VOSK_MODEL_PATH = str(_LOCAL_VOSK_DIR)
+else:
+    VOSK_MODEL_PATH = r"C:\vosk-model-small-en-us-0.15"
 
 WAKE_WORD = "sam"          # Isko bolne se SAM activate hoga
 ASSISTANT_NAME = "SAM"

@@ -15,13 +15,13 @@ import json
 import time
 import struct
 
-from config import LISTEN_TIMEOUT, PHRASE_TIME_LIMIT
+from config import LISTEN_TIMEOUT, PHRASE_TIME_LIMIT, VOSK_MODEL_PATH
 print(">>> LISTENER.PY (VOSK VERSION) — MODULE LOADED <<<", flush=True)
 
 # ============================================================
 # CONFIG
 # ============================================================
-VOSK_MODEL_PATH = os.getenv("VOSK_MODEL_PATH", r"C:\vosk-model-small-en-us-0.15")
+
 SAMPLE_RATE = 16000
 CHUNK = 4000
 

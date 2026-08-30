@@ -1,14 +1,15 @@
 # main.py
 # SAM ka main loop. Yeh file run karo: python main.py
 
-from config import WAKE_WORD, USER_NAME, ASSISTANT_NAME
-from listener_google import listen, listen_for_wake_word
+from config import WAKE_WORD, USER_NAME, ASSISTANT_NAME, STT_ENGINE
+from listener_factory import listen, listen_for_wake_word
 from speaker import speak
 from brain import handle_command
 
 
+
 def main():
-    print(f"=== {ASSISTANT_NAME} chal raha hai ===")
+    print(f"=== {ASSISTANT_NAME} chal raha hai (Engine: {STT_ENGINE.upper()}) ===")
     try:
         speak(f"Assalam o Alaikum {USER_NAME}, main {ASSISTANT_NAME} hoon. '{WAKE_WORD}' bol kar mujhe bulao.")
     except Exception as exc:
