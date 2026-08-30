@@ -5,12 +5,13 @@ import speech_recognition as sr
 from config import LISTEN_TIMEOUT, PHRASE_TIME_LIMIT
 
 recognizer = sr.Recognizer()
-recognizer.energy_threshold = 300
+recognizer.energy_threshold = 100  # Lowered to 100 for soft mics
 recognizer.dynamic_energy_threshold = True
 recognizer.dynamic_energy_adjustment_damping = 0.15
 recognizer.dynamic_energy_adjustment_ratio = 1.3
 recognizer.pause_threshold = 0.8
 recognizer.non_speaking_duration = 0.5
+
 
 _cached_device_index = None
 _startup_done = False

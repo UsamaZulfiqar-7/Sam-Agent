@@ -27,7 +27,7 @@ CHUNK = 4000
 
 # Silence detection settings (VAD-lite): itni der silence rehne par capture
 # stop kar dete hain (agar kuch bola ja chuka ho)
-SILENCE_AMPLITUDE_THRESHOLD = 300
+SILENCE_AMPLITUDE_THRESHOLD = 30  # Lowered from 300 to 30 so soft speech is picked up
 SILENCE_DURATION_TO_STOP = 1.2  # seconds
 
 _model = None
@@ -83,7 +83,7 @@ def _startup_diagnostics():
 
 
 def _get_device_index():
-    """Best microphone device index dhoondta hai (pyaudio ke through, sr.Microphone use nahi karte ab)."""
+    """Best microphone device index dhoondta hai (pyaudio ke through)."""
     global _cached_device_index
 
     _startup_diagnostics()
@@ -180,17 +180,33 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
     recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
     pa = pyaudio.PyAudio()
 
+    # Determine max channels supported by the selected device
     try:
-        stream = pa.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=SAMPLE_RATE,
-            input=True,
-            input_device_index=device_index,
-            frames_per_buffer=CHUNK,
-        )
-    except Exception as exc:
-        print(f"[SAM][ERROR] Mic stream open nahi ho saka: {exc}")
+        dev_info = pa.get_device_info_by_index(device_index)
+        max_ch = int(dev_info.get("maxInputChannels", 1))
+    except Exception:
+        max_ch = 1
+
+    stream = None
+    stream_channels = 1
+    # Try opening 1 channel first, then fallback to device native channels if needed
+    for ch in [1, max_ch] if max_ch > 1 else [1]:
+        try:
+            stream = pa.open(
+                format=pyaudio.paInt16,
+                channels=ch,
+                rate=SAMPLE_RATE,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=CHUNK,
+            )
+            stream_channels = ch
+            break
+        except Exception:
+            continue
+
+    if stream is None:
+        print(f"[SAM][ERROR] Mic stream open nahi ho saka (device index {device_index}).")
         pa.terminate()
         return None
 
@@ -208,7 +224,20 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
             if elapsed > max_duration:
                 break
 
-            data = stream.read(CHUNK, exception_on_overflow=False)
+            raw_data = stream.read(CHUNK, exception_on_overflow=False)
+            
+            # If multi-channel stream opened, extract mono (channel 0)
+            if stream_channels > 1:
+                count = len(raw_data) // (2 * stream_channels)
+                if count > 0:
+                    samples = struct.unpack(f"<{count * stream_channels}h", raw_data[:count * 2 * stream_channels])
+                    mono_samples = samples[::stream_channels]
+                    data = struct.pack(f"<{count}h", *mono_samples)
+                else:
+                    data = raw_data
+            else:
+                data = raw_data
+
             amp = _amplitude(data)
 
             if amp > SILENCE_AMPLITUDE_THRESHOLD:
@@ -226,21 +255,19 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
         stream.close()
         pa.terminate()
 
-    if not heard_any_speech:
-        if verbose:
-            print("[SAM][INFO] Kuch awaaz nahi aayi (silence/timeout).")
-        return None
-
     result = json.loads(recognizer.FinalResult())
     text = result.get("text", "").strip()
 
-    if not text:
-        if verbose:
-            print("[SAM][INFO] Awaaz aayi lekin samajh nahi payi (unclear speech).")
-        return None
+    if text:
+        print(f"[Aap] {text}")
+        return text.lower().strip()
 
-    print(f"[Aap] {text}")
-    return text.lower().strip()
+    if not heard_any_speech and verbose:
+        print("[SAM][INFO] Kuch awaaz nahi aayi (silence/timeout).")
+    elif verbose:
+        print("[SAM][INFO] Awaaz aayi lekin samajh nahi payi (unclear speech).")
+
+    return None
 
 
 def listen_for_wake_word(wake_word: str):
@@ -257,4 +284,4 @@ def listen_for_wake_word(wake_word: str):
         return True
     if text:
         print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
-    return False
+    return False
