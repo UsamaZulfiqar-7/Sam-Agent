@@ -18,8 +18,9 @@ elif _LOCAL_VOSK_DIR.exists() and _LOCAL_VOSK_DIR.is_dir():
 else:
     VOSK_MODEL_PATH = r"C:\vosk-model-small-en-us-0.15"
 
-WAKE_WORD = "sam"          # Isko bolne se SAM activate hoga
-ASSISTANT_NAME = "SAM"
+WAKE_WORD = "friend"          # Isko bolne se Friend activate hoga
+ASSISTANT_NAME = "Friend"
+
 
 # Agar tum chahte ho SAM tumhare naam se pukare tumhe
 USER_NAME = "Sir"

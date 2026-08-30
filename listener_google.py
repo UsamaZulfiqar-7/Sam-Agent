@@ -216,7 +216,7 @@ def listen_for_wake_word(wake_word: str):
         return False
 
     w = wake_word.lower().strip()
-    phonetic_variations = {w, "some", "sum", "same", "sammy", "sim", "xam", "sun", "sham", "tam", "stem", "send", "son"}
+    phonetic_variations = {w, "friend", "friends", "frend", "fred", "hey friend", "hi friend", "hello friend"}
 
     words = set(text.split())
     if w in text or any(v in words for v in phonetic_variations):
