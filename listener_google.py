@@ -212,8 +212,15 @@ def listen_for_wake_word(wake_word: str):
         print(f"[SAM][ERROR] Wake-word listening error: {exc}")
         return False
 
-    if text and wake_word in text:
+    if not text:
+        return False
+
+    w = wake_word.lower().strip()
+    phonetic_variations = {w, "some", "sum", "same", "sammy", "sim", "xam", "sun", "sham", "tam", "stem", "send", "son"}
+
+    words = set(text.split())
+    if w in text or any(v in words for v in phonetic_variations):
         return True
-    if text:
-        print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
+
+    print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
     return False

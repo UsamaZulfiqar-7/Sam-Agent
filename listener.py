@@ -272,7 +272,7 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
 
 def listen_for_wake_word(wake_word: str):
     """
-    Continuously sunta rehta hai jab tak wake word ('sam') na bole jaye.
+    Continuously sunta rehta hai jab tak wake word ('sam') ya uske phonetic variations na bole jayein.
     """
     try:
         text = listen(timeout=5, phrase_time_limit=4, verbose=False)
@@ -280,8 +280,17 @@ def listen_for_wake_word(wake_word: str):
         print(f"[SAM][ERROR] Wake-word listening error: {exc}")
         return False
 
-    if text and wake_word in text:
+    if not text:
+        return False
+
+    w = wake_word.lower().strip()
+    # Vosk model 'sam' ko acoustics ke hisaab se 'some', 'sum', 'same', 'sammy', 'sim', 'sun', 'send', 'stem' samajhta hai.
+    phonetic_variations = {w, "some", "sum", "same", "sammy", "sim", "xam", "sun", "sham", "tam", "stem", "send", "son"}
+
+    words = set(text.split())
+    if w in text or any(v in words for v in phonetic_variations):
         return True
-    if text:
-        print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
-    return False
+
+    print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
+    return False
+
