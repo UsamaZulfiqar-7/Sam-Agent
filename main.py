@@ -18,11 +18,14 @@ def main():
     while True:
         try:
             print(f"\n(Sun raha hoon... '{WAKE_WORD}' bolo)")
-            heard_wake = listen_for_wake_word(WAKE_WORD)
+            heard_wake, direct_command = listen_for_wake_word(WAKE_WORD)
 
             if heard_wake:
-                speak("Ji, boliye.")
-                command = listen()
+                if direct_command:
+                    command = direct_command
+                else:
+                    speak("Ji, boliye.")
+                    command = listen()
 
                 if command is None:
                     speak("Kuch sunayi nahi diya, dobara koshish karo.")
@@ -33,6 +36,7 @@ def main():
 
                 if should_exit:
                     break
+
 
         except KeyboardInterrupt:
             speak("SAM band ho raha hai. Allah Hafiz!")

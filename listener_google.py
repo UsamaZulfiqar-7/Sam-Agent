@@ -205,22 +205,38 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
     return None
 
 
+NOISE_WORDS = {"i", "a", "the", "uh", "um", "to", "in", "it", "at", "is", "of", "on", "or", "by", "an", "be", "do", "huh"}
+
+
 def listen_for_wake_word(wake_word: str):
     try:
         text = listen(timeout=5, phrase_time_limit=4, verbose=False)
     except Exception as exc:
         print(f"[SAM][ERROR] Wake-word listening error: {exc}")
-        return False
+        return False, None
 
     if not text:
-        return False
+        return False, None
+
+    t = text.lower().strip()
+    words = set(t.split())
+
+    if t in NOISE_WORDS or (len(words) == 1 and t in NOISE_WORDS):
+        return False, None
 
     w = wake_word.lower().strip()
-    phonetic_variations = {w, "friend", "friends", "frend", "fred", "hey friend", "hi friend", "hello friend"}
+    phonetic_variations = {w, "sam", "friend", "friends", "frend", "fred", "hey", "hello", "hi", "hey friend", "hi friend", "hello friend", "my friend"}
 
-    words = set(text.split())
-    if w in text or any(v in words for v in phonetic_variations):
-        return True
+    if w in t or any(v in words for v in phonetic_variations):
+        return True, None
 
-    print(f"[SAM][INFO] Kuch suna lekin wake word '{wake_word}' nahi tha: '{text}'")
-    return False
+    try:
+        from brain import is_direct_command
+        if is_direct_command(t):
+            print(f"[Friend] Direct command detected: '{t}'")
+            return True, t
+    except Exception:
+        pass
+
+    print(f"[Friend][INFO] Sunaya: '{t}'")
+    return False, None

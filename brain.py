@@ -9,7 +9,23 @@ import os
 import actions
 from config import APP_PATHS, WEBSITES, USER_NAME, ASSISTANT_NAME, WAKE_WORD
 
+def is_direct_command(text: str) -> bool:
+    """Checks if input text is a known direct action command."""
+    if not text:
+        return False
+    t = text.lower().strip()
+    wake = WAKE_WORD.lower()
+    
+    keywords = [
+        "open", "khol", "start", "time", "date", "tareekh", "youtube",
+        "search", "dhoondo", "screenshot", "volume", "lock", "shutdown",
+        "cancel", "find file", "file dhoondo", "exit", "band ho jao", "bye", "stop", "hello", "hi", "salam"
+    ]
+    return any(kw in t for kw in keywords)
+
+
 def handle_command(text: str) -> tuple[str, bool]:
+
     """
     text: user ne jo bola (already lowercase)
     Returns: (response_text, should_exit)
