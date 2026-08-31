@@ -295,7 +295,7 @@ def listen_for_wake_word(wake_word: str):
         return False, None
 
     w = wake_word.lower().strip()
-    phonetic_variations = {w, "sam", "friend", "friends", "frend", "fred", "hey", "hello", "hi", "hey friend", "hi friend", "hello friend", "my friend"}
+    phonetic_variations = {w, "sam", "sams", "hey", "hello", "hi", "hey sam", "hi sam", "hello sam", "my sam", "friend"}
 
     if w in t or any(v in words for v in phonetic_variations):
         return True, None
@@ -304,12 +304,12 @@ def listen_for_wake_word(wake_word: str):
     try:
         from brain import is_direct_command
         if is_direct_command(t):
-            print(f"[Friend] Direct command detected: '{t}'")
+            print(f"[SAM] Direct command detected: '{t}'")
             return True, t
     except Exception:
         pass
 
-    print(f"[Friend][INFO] Sunaya: '{t}'")
+    print(f"[SAM][INFO] Sunaya: '{t}'")
     return False, None
 
 
