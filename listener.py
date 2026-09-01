@@ -27,7 +27,7 @@ CHUNK = 4000
 
 # Silence detection settings (VAD-lite): itni der silence rehne par capture
 # stop kar dete hain (agar kuch bola ja chuka ho)
-SILENCE_AMPLITUDE_THRESHOLD = 30  # Lowered from 300 to 30 so soft speech is picked up
+SILENCE_AMPLITUDE_THRESHOLD = 1200  # Tuned for Realtek arrays to ignore ~700 AC background noise
 SILENCE_DURATION_TO_STOP = 1.2  # seconds
 
 _model = None
@@ -153,7 +153,10 @@ def _amplitude(chunk_bytes: bytes) -> int:
     if count == 0:
         return 0
     samples = struct.unpack(f"<{count}h", chunk_bytes[:count * 2])
-    return max(abs(s) for s in samples)
+    if not samples:
+        return 0
+    # Use AC amplitude (max - min) / 2 to ignore DC offset
+    return (max(samples) - min(samples)) // 2
 
 
 def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=True):
@@ -217,6 +220,7 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
     last_speech_time = None
     heard_any_speech = False
     max_duration = max(timeout if timeout is not None else 5, phrase_time_limit, 5)
+    is_phrase_complete = False
 
     try:
         while True:
@@ -226,12 +230,27 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
 
             raw_data = stream.read(CHUNK, exception_on_overflow=False)
             
-            # If multi-channel stream opened, extract mono (channel 0)
+            # Extract the best channel (avoid dead channels or channels pegged with huge DC offset/clipping noise)
             if stream_channels > 1:
                 count = len(raw_data) // (2 * stream_channels)
                 if count > 0:
                     samples = struct.unpack(f"<{count * stream_channels}h", raw_data[:count * 2 * stream_channels])
-                    mono_samples = samples[::stream_channels]
+                    best_ch = 0
+                    max_valid_energy = -1
+                    for ch in range(stream_channels):
+                        ch_samples = samples[ch::stream_channels]
+                        mean = sum(ch_samples) / count
+                        ac_energy = max(abs(s - mean) for s in ch_samples)
+                        # Pick the channel with the HIGHEST energy (actual voice) that is NOT clipping noise (< 15000)
+                        if 50 < ac_energy < 15000:
+                            if ac_energy > max_valid_energy:
+                                max_valid_energy = ac_energy
+                                best_ch = ch
+                    
+                    if max_valid_energy == -1:
+                        best_ch = 1 if stream_channels >= 4 else 0  # fallback
+
+                    mono_samples = samples[best_ch::stream_channels]
                     data = struct.pack(f"<{count}h", *mono_samples)
                 else:
                     data = raw_data
@@ -244,7 +263,11 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
                 heard_any_speech = True
                 last_speech_time = time.time()
 
-            recognizer.AcceptWaveform(data)
+            is_phrase_complete = recognizer.AcceptWaveform(data)
+
+            if is_phrase_complete:
+                if heard_any_speech:
+                    break
 
             # Agar speech ho chuki hai aur ab thodi der se silence hai, capture khatam karo
             if heard_any_speech and last_speech_time is not None:
@@ -255,7 +278,10 @@ def listen(timeout=LISTEN_TIMEOUT, phrase_time_limit=PHRASE_TIME_LIMIT, verbose=
         stream.close()
         pa.terminate()
 
-    result = json.loads(recognizer.FinalResult())
+    if is_phrase_complete:
+        result = json.loads(recognizer.Result())
+    else:
+        result = json.loads(recognizer.FinalResult())
     text = result.get("text", "").strip()
 
     if text:
